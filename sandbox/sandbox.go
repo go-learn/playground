@@ -42,6 +42,7 @@ func main() {
 		test()
 		return
 	}
+	log.Println("Sandbox start!")
 	http.HandleFunc("/compile", compileHandler)
 	http.HandleFunc("/_ah/health", healthHandler)
 	log.Fatal(http.ListenAndServe(":8080", nil))
@@ -49,9 +50,16 @@ func main() {
 
 func compileHandler(w http.ResponseWriter, r *http.Request) {
 	var req Request
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		http.Error(w, fmt.Sprintf("error decoding request: %v", err), http.StatusBadRequest)
-		return
+	version := r.PostFormValue("version")
+	log.Printf("request version: %v \n", version)
+	log.Printf("request body: %v \n", r.Body)
+	if version == "2" {
+		req.Body = r.PostFormValue("body")
+	} else {
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			http.Error(w, fmt.Sprintf("error decoding request: %v", err), http.StatusBadRequest)
+			return
+		}
 	}
 	resp, err := compileAndRun(&req)
 	if err != nil {
@@ -147,6 +155,7 @@ func healthHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Health check failed: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	fmt.Println("I'm OK")
 	fmt.Fprint(w, "ok")
 }
 
@@ -292,37 +301,4 @@ func main() {
     println("test")
 }
 `, want: "", errors: "package name must be main"},
-	{prog: `
-package main
-
-import (
-	"fmt"
-	"os"
-	"path/filepath"
-)
-
-func main() {
-	filepath.Walk("/", func(path string, info os.FileInfo, err error) error {
-		fmt.Println(path)
-		return nil
-	})
-}
-`, want: `/
-/dev
-/dev/null
-/dev/random
-/dev/urandom
-/dev/zero
-/etc
-/etc/group
-/etc/hosts
-/etc/passwd
-/etc/resolv.conf
-/tmp
-/usr
-/usr/local
-/usr/local/go
-/usr/local/go/lib
-/usr/local/go/lib/time
-/usr/local/go/lib/time/zoneinfo.zip`},
 }
